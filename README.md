@@ -21,18 +21,20 @@
 
 ## 🚀 실행 순서
 
+**Windows:**
 ```bash
-# 1단계: 이력서 검색 및 수집
-python main.py
+python main.py         # 1단계: 이력서 검색 및 수집
+python Detail.py       # 2단계: 자기소개서/자격증 추출
+python grade.py        # 3단계: 후보자 평가
+python position_offer.py  # 4단계: 포지션 제안 문구 생성
+```
 
-# 2단계: 자기소개서/자격증 추출
-python Detail.py
-
-# 3단계: 후보자 평가
-python grade.py
-
-# 4단계: 포지션 제안 문구 생성
-python position_offer.py
+**macOS/Linux:**
+```bash
+python3 main.py
+python3 Detail.py
+python3 grade.py
+python3 position_offer.py
 ```
 
 ## ⚙️ 환경 설정
@@ -73,16 +75,22 @@ playwright install chromium
 
 ### 4. OpenAI API 키 설정 (4단계용)
 
-```bash
-# 환경변수 설정 (macOS/Linux)
-export OPENAI_API_KEY_COMPANY="sk-..."
-
-# Windows (PowerShell)
+**Windows (PowerShell) - 권장:**
+```powershell
 $env:OPENAI_API_KEY_COMPANY="sk-..."
+```
 
-# Windows (CMD)
+**Windows (CMD):**
+```cmd
 set OPENAI_API_KEY_COMPANY=sk-...
 ```
+
+**macOS/Linux:**
+```bash
+export OPENAI_API_KEY_COMPANY="sk-..."
+```
+
+> 💡 **Windows 사용자 주의**: PowerShell과 CMD는 다릅니다! 터미널 종류를 확인하세요.
 
 ## 📁 파일 구조
 
@@ -351,13 +359,13 @@ generator = PositionOfferGenerator(api_key="sk-proj-...")
 ### 포지션 제안 API
 **URL**: `https://www.jobkorea.co.kr/Corp/Person/PositionOfferSave`
 
-상세 스펙: [position_offer_api.md](position_offer_api.md) 참고
+상세 스펙: [포지션제안API설명.md](포지션제안API설명.md) 참고
 
 ---
 
 ## 📝 개발 노트
 
-- **개발일**: 2025년 11월
+- **작성일**: 2025년 11월 03일
 - **개발자**: 김동훈
 - **목적**: 잡코리아 채용 프로세스 자동화
 - **기술 스택**: Python, Playwright, OpenAI API, BeautifulSoup

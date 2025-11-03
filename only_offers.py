@@ -50,7 +50,8 @@ def extract_offer_messages(input_file: str, output_file: str = "output/only_offe
 
 
 def main():
-    input_file = "/Users/gimdonghun/Documents/apiTEst/output/kspac2022_with_offers.json"
+    # 상대 경로 사용 (Windows/macOS 모두 호환)
+    input_file = "output/kspac2022_with_offers.json"
     output_file = "output/only_offers.json"
 
     extract_offer_messages(input_file, output_file)
