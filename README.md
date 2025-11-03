@@ -98,6 +98,7 @@ apiTEst/
 ├── data/
 │   └── payload_template.json       # API 요청 템플릿
 ├── src/
+│   ├── runner.py                   # 실행 관리자 (NEW)
 │   ├── config.py                   # 설정 관리
 │   ├── auth.py                     # 인증 처리
 │   ├── scraper.py                  # 스크래핑 로직
