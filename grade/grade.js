@@ -76,21 +76,14 @@ var KW = {
   }
   
   function scoreCustomerComm(u){
-    var essay = bagJoin([u["자기소개서_성장과정및성격"], u["자기소개서_경험및역량"]]);
-    var strong = hasAny(essay, KW.commStrong);
-    var medium = hasAny(essay, KW.commMedium);
-  
+    // 자기소개서 제거됨
     var comm20 = 0;
-    if (strong && RX.numberHit.test(essay)) comm20 = 15;
-    else if (strong) comm20 = 10;
-    else if (medium) comm20 = 5;
-    if (hasAny(essay, ["친화","긍정","관계 형성","적극"])) comm20 = max(comm20, 5);
-  
+
     var fit5 = 0;
     var fitText = toStr(u["인재상"]);
     if (hasAny(fitText, ["고객 중심","관계","소통","긍정","신뢰"])) fit5 = 5;
     else if (fitText) fit5 = 3;
-  
+
     return { subtotal: comm20 + fit5 };
   }
   
@@ -109,16 +102,12 @@ var KW = {
   
     return { subtotal: cert20 + edu10 };
   }
-  // 자기소개서
   function scoreMotivationAndLang(u){
-    var motive = toStr(u["자기소개서_지원동기및포부"]);
+    // 자기소개서 제거됨
     var lang   = bagJoin([u["어학요약"], u["어학능력상세"], u["skills"]]);
-  
+
     var mot10 = 0;
-    if (hasAny(motive, KW.motiveStrong)) mot10 = 10;
-    else if (hasAny(motive, KW.motiveWeak)) mot10 = 5;
-    else if (motive) mot10 = 2;
-  
+
     var lang5 = 0, toeic = findToeicScore(lang), opic = findOpicLevel(lang);
     if (!isNaN(toeic)){
       if (toeic >= 900) lang5 = 5;
@@ -131,7 +120,7 @@ var KW = {
       else lang5 = 1;
     }
     if (lang5 === 0 && hasAny(lang, KW.langNames)) lang5 = 1;
-  
+
     return { subtotal: mot10 + lang5 };
   }
   

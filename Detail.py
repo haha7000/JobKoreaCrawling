@@ -1,10 +1,17 @@
 """
 실제 실행 중인 Chrome에 연결하여 자기소개서 추출
 """
+from bs4.element import Tag
+
+
 from playwright.sync_api import sync_playwright
 from bs4 import BeautifulSoup
 import json
 import time
+import subprocess
+import os
+import signal
+import platform
 from pathlib import Path
 from src.account_manager import AccountManager
 from src.auth import JobKoreaAuth
@@ -25,7 +32,7 @@ def extract_introduction_from_page(page):
         return None
 
     data = []
-    for idx, li in enumerate(items, 1):
+    for idx, li in enumerate[Tag](items, 1):
         title_elem = li.select_one("div.header")
         title = title_elem.get_text(strip=True) if title_elem else None
 
@@ -110,9 +117,10 @@ def login_and_get_cookies(username: str, password: str):
     return cookies
 
 
-def extract_all_resumes(summary_json_path: str, max_count: int = None):
+def extract_all_resumes(summary_json_path: str, max_count: int = None, output_file: str = "output/Details.json"):
     """
     실행 중인 Chrome에 연결하여 자기소개서 일괄 추출
+    1명씩 처리할 때마다 JSON 파일에 저장 (중간 손실 방지)
     """
     # 이력서 목록 로드
     with open(summary_json_path, 'r', encoding='utf-8') as f:
@@ -123,6 +131,21 @@ def extract_all_resumes(summary_json_path: str, max_count: int = None):
     if max_count:
         resumes = resumes[:max_count]
         print(f"   → {max_count}개만 처리합니다.\n")
+
+    # 기존 진행 상황 확인 (이어서 하기)
+    if Path(output_file).exists():
+        with open(output_file, 'r', encoding='utf-8') as f:
+            try:
+                existing_results = json.load(f)
+                processed_rnos = {r.get('이력서번호') for r in existing_results if r.get('추출상태') == '성공'}
+                print(f"💾 기존 저장 파일 발견: {len(existing_results)}개 처리됨")
+                print(f"   이어서 진행합니다...\n")
+                results = existing_results
+            except:
+                results = []
+    else:
+        processed_rnos = set()
+        results = []
 
     # 계정 정보 로드
     excel_path = "configs/jobkorea_Excel.xlsx"
@@ -146,16 +169,68 @@ def extract_all_resumes(summary_json_path: str, max_count: int = None):
     if not cookies:
         return []
 
+    # Chrome 자동 실행
+    chrome_process = None
     print("=" * 80)
-    print("📌 사용 방법:")
+    print("🚀 Chrome 디버깅 모드 자동 실행")
     print("=" * 80)
-    print("1. Chrome을 디버깅 모드로 실행해야 합니다:")
-    print("   /Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome --remote-debugging-port=9222")
-    print("\n2. 이 스크립트가 자동으로 로그인 + 이력서를 추출합니다")
-    print("=" * 80)
-    print("\n🔍 Chrome이 이미 실행 중인지 확인하는 중...\n")
 
-    results = []
+    # OS별 Chrome 경로 및 user-data-dir 설정
+    system = platform.system()
+    if system == "Darwin":  # macOS
+        chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+        user_data_dir = "/tmp/chrome-debug"
+        manual_cmd = '/Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome --remote-debugging-port=9222'
+    elif system == "Windows":
+        # Windows Chrome 경로 (일반적인 위치들 체크)
+        possible_paths = [
+            "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+            "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+            os.path.expandvars("%LOCALAPPDATA%\\Google\\Chrome\\Application\\chrome.exe")
+        ]
+        chrome_path = None
+        for path in possible_paths:
+            if os.path.exists(path):
+                chrome_path = path
+                break
+        if not chrome_path:
+            chrome_path = "chrome.exe"  # PATH에 있을 경우
+        user_data_dir = os.path.expandvars("%TEMP%\\chrome-debug")
+        manual_cmd = 'chrome.exe --remote-debugging-port=9222'
+    else:  # Linux
+        chrome_path = "google-chrome"
+        user_data_dir = "/tmp/chrome-debug"
+        manual_cmd = 'google-chrome --remote-debugging-port=9222'
+
+    try:
+        chrome_cmd = [
+            chrome_path,
+            "--remote-debugging-port=9222",
+            f"--user-data-dir={user_data_dir}"
+        ]
+
+        print(f"📌 OS: {system}")
+        print(f"📌 실행 명령어:")
+        if system == "Windows":
+            print(f'   "{chrome_path}" --remote-debugging-port=9222 --user-data-dir={user_data_dir}\n')
+        else:
+            print(f"   {' '.join([f'\"{p}\"' if ' ' in p else p for p in chrome_cmd])}\n")
+
+        # Chrome 프로세스 실행
+        chrome_process = subprocess.Popen(
+            chrome_cmd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+
+        print("✅ Chrome 실행 중...")
+        print("⏳ Chrome이 완전히 시작될 때까지 5초 대기...\n")
+        time.sleep(5)
+
+    except Exception as e:
+        print(f"⚠️  Chrome 자동 실행 실패: {e}")
+        print("수동으로 실행해주세요:")
+        print(f"   {manual_cmd}\n")
 
     with sync_playwright() as p:
         try:
@@ -191,6 +266,11 @@ def extract_all_resumes(summary_json_path: str, max_count: int = None):
                 resume_no = resume.get('이력서번호')
                 resume_link = resume.get('이력서링크')
                 name = resume.get('이름', 'Unknown')
+
+                # 이미 처리된 경우 건너뛰기
+                if resume_no in processed_rnos:
+                    print(f"[{idx}/{len(resumes)}] {name} (rNo={resume_no}) - ⏭️  건너뜀 (이미 처리됨)")
+                    continue
 
                 print(f"[{idx}/{len(resumes)}] {name} (rNo={resume_no})")
 
@@ -234,7 +314,10 @@ def extract_all_resumes(summary_json_path: str, max_count: int = None):
                     else:
                         print(f"   ⚠️  자격증 없음")
 
-                    print()
+                    # 🔥 즉시 JSON 파일에 저장
+                    with open(output_file, "w", encoding="utf-8") as f:
+                        json.dump(results, f, ensure_ascii=False, indent=2)
+                    print(f"   💾 저장 완료 ({len(results)}/{len(resumes)})\n")
 
                     # 요청 간 간격
                     time.sleep(1)
@@ -250,6 +333,11 @@ def extract_all_resumes(summary_json_path: str, max_count: int = None):
                     }
                     results.append(result)
 
+                    # 🔥 오류 발생해도 즉시 저장
+                    with open(output_file, "w", encoding="utf-8") as f:
+                        json.dump(results, f, ensure_ascii=False, indent=2)
+                    print(f"   💾 저장 완료 (오류 포함)\n")
+
                     time.sleep(1)
 
         except Exception as e:
@@ -261,6 +349,17 @@ def extract_all_resumes(summary_json_path: str, max_count: int = None):
             import traceback
             traceback.print_exc()
             return []
+        finally:
+            # Chrome 프로세스 종료
+            if chrome_process:
+                print("\n🛑 Chrome 프로세스 종료 중...")
+                try:
+                    chrome_process.terminate()
+                    chrome_process.wait(timeout=5)
+                    print("✅ Chrome 종료 완료")
+                except:
+                    chrome_process.kill()
+                    print("✅ Chrome 강제 종료 완료")
 
     return results
 
@@ -271,6 +370,7 @@ def main():
 
     # 이력서 목록 파일
     summary_json = "output/kspac2022_summary.json"
+    output_file = "output/kspac2022_with_introduction.json"
 
     if not Path(summary_json).exists():
         print(f"❌ 파일을 찾을 수 없습니다: {summary_json}")
@@ -282,16 +382,14 @@ def main():
     # 전체 처리하려면 max_count=None으로 변경
     results = extract_all_resumes(
         summary_json_path=summary_json,
-        max_count=100  # None으로 변경하면 전체 처리
+        max_count=None,  # None으로 변경하면 전체 처리
+        output_file=output_file
     )
 
     if not results:
         return
 
-    # 결과 저장
-    output_file = "output/kspac2022_with_introduction.json"
-    with open(output_file, "w", encoding="utf-8") as f:
-        json.dump(results, f, ensure_ascii=False, indent=2)
+    # 최종 결과는 이미 저장되어 있음 (각 단계마다 저장했으므로)
 
     # ⏱️ 종료 시간 및 경과 시간 계산
     end_time = time.time()

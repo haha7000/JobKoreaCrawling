@@ -220,7 +220,7 @@ def main():
     OUTPUT_DIR = "output"
 
     # 🔥 최근활동 필터링 설정 (분 단위)
-    FILTER_ACTIVE_WITHIN_MINUTES = 240  # 30분 이내 활동한 사용자만 추출
+    FILTER_ACTIVE_WITHIN_MINUTES = 30  # 30분 이내 활동한 사용자만 추출
 
     # =====================================================
 
